@@ -24,6 +24,10 @@ class Data:
         P2 = np.reshape(P1, (len(P1), P1.shape[1]*P1.shape[2]))
         self.train = P2.T
 
+    def load_and_process_train_data_mem(self, fname):
+        D = self.load_data_from_file(fname)
+        self.train = D
+
     def load_and_process_valid_data(self, fname):
         D = self.load_data_from_file(fname)
         P1 = D[:, self.input_order, :]

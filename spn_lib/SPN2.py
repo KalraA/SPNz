@@ -8,17 +8,19 @@ class SPN:
 		self.model = None
 		self.data = None
 		self.loss = []
-		self.val_loss = None
+		self.val_loss = []
 		self.test_loss = None
 		self.session_on = False
+		self.input_order = []
 
 	def make_model_from_file(self, fname, random_weights=False):
 		self.model = Model(fname, random_weights)
 		self.data = Data(self.model.input_order)
+		self.input_order = self.model.input_order
 
 	def add_data(self, filename, dataset='train'):
 		if dataset == 'train':
-			self.data.load_and_process_train_data(filename)
+			self.data.load_and_process_train_data_mem(filename)
 		elif dataset == 'valid':
 			self.data.load_and_process_valid_data(filename)
 		elif dataset == 'test':
@@ -49,8 +51,12 @@ class SPN:
 
 		for e in xrange(epochs):
 			print 'Epoch ' + str(e)
-			for m in xrange(data.shape[1]//minibatch_size+1):
-				feed_dict = {self.model.input: data[:, m*minibatch_size:min(data.shape[1], (m+1)*500)]}
+			for m in xrange(data.shape[0]//minibatch_size+1):
+				n_data = data[m*minibatch_size:min(data.shape[0], (m+1)*minibatch_size)]
+				n_data = n_data[:, self.input_order, :]
+				n_data = np.reshape(n_data, (len(n_data), len(self.input_order)*2))
+				print n_data.shape
+				feed_dict = {self.model.input: n_data.T}
 				_, loss, result = self.model.session.run([self.model.opt_val, 
 														  self.model.loss,
 														  self.model.output], 
