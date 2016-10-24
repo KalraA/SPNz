@@ -7,7 +7,7 @@ class SumNode:
         self.parents = []
         self.weights = []
         self.rank = 0
-        self.Trank = 0
+        self.TRank = 0
         
 class PrdNode:
     def __init__(self, id):

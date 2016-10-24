@@ -14,7 +14,16 @@ class SPN:
 		self.input_order = []
 
 	def make_model_from_file(self, fname, random_weights=False):
-		self.model = Model(fname, random_weights)
+		self.model = Model()
+		self.model.build_model_from_file(fname, random_weights)
+		self.model.compile()
+		self.data = Data(self.model.input_order)
+		self.input_order = self.model.input_order
+
+	def make_random_model(self, bfactor, input_size):
+		self.model = Model()
+		self.model.build_random_model(bfactor, input_size)
+		self.model.compile()
 		self.data = Data(self.model.input_order)
 		self.input_order = self.model.input_order
 
@@ -39,32 +48,50 @@ class SPN:
 		output = self.model.session.run(self.model.output, feed_dict=feed_dict)
 		return output
 
-	def evaluate(self, inp):
-		feed_dict = {self.model.input: inp}
-		loss = self.model.session.run(self.model.loss, feed_dict=feed_dict)
-		return loss
+	def evaluate(self, inp, summ):
+		feed_dict = {self.model.input: inp, self.model.summ: summ}
+		loss, summ = self.model.session.run([self.model.loss, self.model.loss_summary], feed_dict=feed_dict)
+		return loss, summ
 
-	def train(self, epochs, data=[], minibatch_size=512):
+	def train(self, epochs, data=[], minibatch_size=512, valid=True, test=True):
 		if data == []:
 			data = self.data.train
 			print data.shape
 
 		for e in xrange(epochs):
 			print 'Epoch ' + str(e)
+			if e > 0:
+				minibatch_size = 128
+			np.random.shuffle(data)
 			for m in xrange(data.shape[0]//minibatch_size+1):
 				n_data = data[m*minibatch_size:min(data.shape[0], (m+1)*minibatch_size)]
 				n_data = n_data[:, self.input_order, :]
 				n_data = np.reshape(n_data, (len(n_data), len(self.input_order)*2))
-				print n_data.shape
-				feed_dict = {self.model.input: n_data.T}
-				_, loss, result = self.model.session.run([self.model.opt_val, 
-														  self.model.loss,
-														  self.model.output], 
-														  feed_dict=feed_dict)
+				feed_dict = {self.model.input: n_data.T, self.model.summ: "minibatch_loss"}
+				if e == 0:
+					_, loss, result, summary = self.model.session.run([self.model.opt_val, 
+															  self.model.loss,
+															  self.model.output, 
+															  self.model.loss_summary], 
+															  feed_dict=feed_dict)
+				else:
+					_, loss, result, summary = self.model.session.run([self.model.opt_val2, 
+															  self.model.loss,
+															  self.model.output, 
+															  self.model.loss_summary], 
+															  feed_dict=feed_dict)
+				self.model.writer.add_summary(summary, e*data.shape[0]//minibatch_size+1 + m)
 				self.loss.append(loss)
 				self.model.get_normal_value()
 				# print self.model.norm_value
-				print "Loss: " + str(loss)
+				# print "Loss: " + str(loss)
+			if (valid):
+				val_loss, val_sum = self.evaluate(self.data.valid, 'valid_loss')
+				self.model.writer.add_summary(val_sum, e)
+
+			if (test):
+				test_loss, test_sum = self.evaluate(self.data.test, 'test_loss')
+				self.model.writer.add_summary(test_sum, e)
 				# print "Min: " + str(result)
 				# print list(data[:, m*500:min(data.shape[1], (m+1)*500)])
 				# print map(lambda x: self.model.session.run(x), self.model.sparse_tensors)
