@@ -57,6 +57,13 @@ class SPN:
 		if data == []:
 			data = self.data.train
 			print data.shape
+		if (valid):
+				val_loss, val_sum = self.evaluate(self.data.valid, 'valid_loss')
+				self.model.writer.add_summary(val_sum, 0)
+
+		if (test):
+			test_loss, test_sum = self.evaluate(self.data.test, 'test_loss')
+			self.model.writer.add_summary(test_sum, 0)
 
 		for e in xrange(epochs):
 			print 'Epoch ' + str(e)
@@ -87,11 +94,12 @@ class SPN:
 				# print "Loss: " + str(loss)
 			if (valid):
 				val_loss, val_sum = self.evaluate(self.data.valid, 'valid_loss')
-				self.model.writer.add_summary(val_sum, e)
+				self.model.writer.add_summary(val_sum, e+1)
+				print val_loss
 
 			if (test):
 				test_loss, test_sum = self.evaluate(self.data.test, 'test_loss')
-				self.model.writer.add_summary(test_sum, e)
+				self.model.writer.add_summary(test_sum, e+1)
 				# print "Min: " + str(result)
 				# print list(data[:, m*500:min(data.shape[1], (m+1)*500)])
 				# print map(lambda x: self.model.session.run(x), self.model.sparse_tensors)

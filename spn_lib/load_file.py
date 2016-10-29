@@ -65,7 +65,7 @@ def split_up_file(fname):
     edges = lines[n+1:]
     return nodes, edges
 
-def build_nodes(nodes):
+def build_nodes(nodes, random_weights=False):
     big_dict = {}
     Leaves = []
     Prods = []
@@ -83,6 +83,9 @@ def build_nodes(nodes):
             Sums.append(arr[0])
         elif 'LEAVE' in l:
             arr = l.split(',')
+            if random_weights:
+                arr[3] = random.random();
+                arr[4] = 1.0 - arr[3]
             node = Leaf(arr[0], arr[3], arr[4], arr[2])
             big_dict[arr[0]] = node
             Leaves.append(arr[0])
@@ -202,7 +205,7 @@ def load_file(fname, random_weights=False):
     #get the node and edge strings from a file
     file_nodes, file_edges = split_up_file(fname)
     #get all the different nodes and a dict that matches id to node
-    leaf_ids, prod_ids, sum_ids, id_node_dict = build_nodes(file_nodes)
+    leaf_ids, prod_ids, sum_ids, id_node_dict = build_nodes(file_nodes, random_weights)
     #add all the edges to the nodes
     id_node_dict = add_connections(id_node_dict, file_edges, random_weights)
     if random_weights:
