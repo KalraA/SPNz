@@ -53,6 +53,10 @@ class SPN:
 		loss, summ = self.model.session.run([self.model.loss, self.model.loss_summary], feed_dict=feed_dict)
 		return loss, summ
 
+	def test(self):
+		vals = self.model.session.run(self.model.sparse_tensors + self.model.counter_tensors)
+		print vals
+
 	def train(self, epochs, data=[], minibatch_size=512, valid=True, test=True):
 		if data == []:
 			data = self.data.train

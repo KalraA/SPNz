@@ -11,5 +11,5 @@ print my_spn.predict([[1]]*len(my_spn.input_order)*2)
 my_spn.add_data('../Data/nltcs.ts.data')
 my_spn.add_data('../Data/nltcs.test.data', 'test')
 my_spn.add_data('../Data/nltcs.valid.data', 'valid')
-my_spn.train(25, minibatch_size=8)
+my_spn.test()
 print 'tests passed!'

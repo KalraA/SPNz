@@ -123,8 +123,6 @@ def add_ranks(id_node_dict, leaf_id):
     currs = prev_currs
     while len(currs) > 0:
         new_currs = set()
-        print rank
-        print currs
         for s in list(currs):
             for p in id_node_dict[s].children:
                 new_currs.add(p)
@@ -137,7 +135,7 @@ def create_layers(id_node_dict, rank):
     node_list = [[] for x in range(rank)]
     for k in id_node_dict.keys():
         n = id_node_dict[k]
-        print n.TRank
+        # print n.TRank
         node_list[n.TRank].append(n)
     return node_list[1:]
 

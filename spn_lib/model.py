@@ -23,6 +23,7 @@ class Model:
         self.variables = [] #all variables
         self.layer_computations = [] #all mid computations in graph
         self.norm_value = 1.0
+        self.counter_tensors = []
 
         #Nodes loaded from files
     
@@ -79,7 +80,7 @@ class Model:
             ws.append(a)
             ws.append(b)
         s = [len(leafs), len(leafs)*2]
-        print inds
+        # print inds
         return tf.Variable(ws, dtype=tf.float64), tf.constant(s, dtype=tf.int64), tf.constant(inds, dtype=tf.int64)
 
 
@@ -92,7 +93,9 @@ class Model:
                                          None), name='Input')
             #Input matrix
             input_weights, input_shape, input_indices = self.build_input_matrix(self.leaf_id_order)
-            
+            input_counter = tf.constant([1.0]*len(self.input_order)*2, dtype=tf.float64)
+            input_counter_matrix = tf.SparseTensor(input_indices, input_counter, input_shape)
+            self.counter_tensors.append(input_counter_matrix)
             input_matrix = tf.SparseTensor(input_indices, tf.add(tf.nn.relu(tf.identity(input_weights)), 0.001), input_shape)
 
         #Layer Matrices
@@ -125,13 +128,16 @@ class Model:
                 W = tf.Variable(weights, trainable=trainable, dtype=tf.float64)
                 I = tf.constant(indices, dtype=tf.int64)
                 S = tf.constant(shape, dtype=tf.int64)
+                C = tf.constant([1.0]*len(weights), dtype=tf.float64)
                 # print shape
                 L += 1
                 matrix = tf.SparseTensor(I, tf.nn.relu(tf.identity(W)), S)
+                counter_matrix = tf.SparseTensor(I, C, S);
             variables.append((W, I, S, shape))
+            self.counter_tensors.append(counter_matrix)
             layer_matrices.append(matrix)
         self.sparse_tensors = [input_matrix] + layer_matrices
-        self.variables = variables
+        self.variables = [(input_weights, input_indices, input_shape, [len(self.input_order), len(self.input_order)*2])] + variables
 
             
     def build_forward_graph(self):
@@ -142,8 +148,8 @@ class Model:
         #compute the input
         with tf.name_scope('NORM_FACTOR'):
             sums_of_sparses = [tf.reshape(tf.sparse_reduce_sum(sm, reduction_axes=1), [-1 ,1]) for sm in self.sparse_tensors]
-        print sums_of_sparses
-        with tf.name_scope('LEAFS_' + str(len(self.input_order)/2)):
+        # print sums_of_sparses
+        with tf.name_scope('LEAFS_' + str(len(self.input_order))):
             input_computation = tf.div(tf.sparse_tensor_dense_matmul(self.sparse_tensors[0], self.input), sums_of_sparses[0])
             computations.append(input_computation)
 
@@ -159,12 +165,12 @@ class Model:
             node_layer = self.node_layers[i+1]
             matrix = self.sparse_tensors[i+1]
             if isinstance(node_layer[0], SumNode):
-                with tf.name_scope('SUM_' + str(self.variables[i][3][0])):
+                with tf.name_scope('SUM_' + str(self.variables[i+1][3][0])):
                     current_computation = tf.concat(0,
                                           [tf.div(tf.sparse_tensor_dense_matmul(matrix, current_computation, name='ComputeSum'), sums_of_sparses[i+1], name='Normalize'), 
                                                                                       input_splits[L]], name='ConcatenateInputs')
             else:
-                with tf.name_scope('PROD_' + str(self.variables[i][3][0])):
+                with tf.name_scope('PROD_' + str(self.variables[i+1][3][0])):
                     current_computation = tf.exp(tf.sparse_tensor_dense_matmul(matrix, tf.log(current_computation, name='ToLogDomain'), name='ComputeProd'), name='ToNormalDomain')
             L += 1;
             computations.append(current_computation)
