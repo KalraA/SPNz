@@ -49,7 +49,7 @@ class Model:
         self.build_variables()
         self.build_forward_graph()
         self.start_session()
-        self.writer = tf.train.SummaryWriter('logs/minibatch_range3', self.session.graph_def)
+        self.writer = tf.train.SummaryWriter('logs/comp/minibatch_range3', self.session.graph_def)
         self.get_normal_value()
         self.close_session()
 

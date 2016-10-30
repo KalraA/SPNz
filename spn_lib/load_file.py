@@ -83,7 +83,7 @@ def build_nodes(nodes):
             Sums.append(arr[0])
         elif 'LEAVE' in l:
             arr = l.split(',')
-            node = Leaf(arr[0], arr[3], arr[4], arr[2])
+            node = Leaf(arr[0], arr[4], arr[3], arr[2])
             big_dict[arr[0]] = node
             Leaves.append(arr[0])
     return Leaves, Prods, Sums, big_dict
