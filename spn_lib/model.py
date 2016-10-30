@@ -49,7 +49,7 @@ class Model:
         self.build_variables()
         self.build_forward_graph()
         self.start_session()
-        self.writer = tf.train.SummaryWriter('logs/comp/minibatch_range3', self.session.graph_def)
+        self.writer = tf.train.SummaryWriter('logs/comp/plants/minibatch_range3', self.session.graph_def)
         self.get_normal_value()
         self.close_session()
 
@@ -93,7 +93,7 @@ class Model:
             #Input matrix
             input_weights, input_shape, input_indices = self.build_input_matrix(self.leaf_id_order)
             
-            input_matrix = tf.SparseTensor(input_indices, tf.add(tf.nn.relu(tf.identity(input_weights)), 0.001), input_shape)
+            input_matrix = tf.SparseTensor(input_indices, tf.add(tf.nn.relu(tf.identity(input_weights)), 0.0001), input_shape)
 
         #Layer Matrices
         layer_matrices = []

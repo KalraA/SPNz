@@ -57,11 +57,10 @@ class SPN:
 		if data == []:
 			data = self.data.train
 			print data.shape
-
 		for e in xrange(epochs):
 			print 'Epoch ' + str(e)
 			if e > 0:
-				minibatch_size = 128
+				minibatch_size = minibatch_size
 			np.random.shuffle(data)
 			for m in xrange(data.shape[0]//minibatch_size+1):
 				n_data = data[m*minibatch_size:min(data.shape[0], (m+1)*minibatch_size)]
@@ -88,10 +87,11 @@ class SPN:
 			if (valid):
 				val_loss, val_sum = self.evaluate(self.data.valid, 'valid_loss')
 				self.model.writer.add_summary(val_sum, e)
-
+				print val_loss
 			if (test):
 				test_loss, test_sum = self.evaluate(self.data.test, 'test_loss')
 				self.model.writer.add_summary(test_sum, e)
-				# print "Min: " + str(result)
+				print test_loss			
+	# print "Min: " + str(result)
 				# print list(data[:, m*500:min(data.shape[1], (m+1)*500)])
 				# print map(lambda x: self.model.session.run(x), self.model.sparse_tensors)
