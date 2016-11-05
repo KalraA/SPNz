@@ -4,6 +4,10 @@ from nodes import *
 import random
 import tensorflow as tf
 import numpy as np
+from e_load import *
+
+# def findMaxesTensor(T, S):
+
 
 class Model:
 
@@ -24,6 +28,9 @@ class Model:
         self.layer_computations = [] #all mid computations in graph
         self.norm_value = 1.0
         self.counter_tensors = []
+        self.weights = None
+        self.counting = []
+        self.updates = []
 
         #Nodes loaded from files
     
@@ -37,6 +44,9 @@ class Model:
         self.opt_val = None
         self.session = None
         self.initalizer = tf.initialize_all_variables
+        self.shuffle = None;
+        self.reverse_shuffle = None;
+        self.inds = None;
 
         #Do Work
 
@@ -46,6 +56,9 @@ class Model:
     def build_random_model(self, bfactor, input_length):
         self.pos_dict, self.id_node_dict, self.node_layers, self.leaf_id_order, self.input_layers, self.input_order = build_random_net(bfactor, input_length)
 
+    def build_fast_model(self, bfactor, input_length):
+        self.pos_dict, self.id_node_dict, self.node_layers, self.leaf_id_order, self.input_layers, self.input_order, self.shuffle, self.inds = e_load(bfactor, input_length)
+
     def compile(self):
         self.build_variables()
         self.build_forward_graph()
@@ -54,6 +67,182 @@ class Model:
         self.get_normal_value()
         self.close_session()
 
+    def build_input_vector(self, leafs):
+        ws = []
+        inds = []
+        for i in range(len(leafs)):
+            node = self.id_node_dict[str(leafs[i])]
+            a = float(node.weights[0])
+            b = float(node.weights[1])
+            ws.append(a)
+            ws.append(b)
+            inds.append(i)
+            inds.append(i)
+        # print inds
+        return tf.Variable(ws, dtype=tf.float64), inds
+
+    def build_reverse_shuffle(self, shuffle):
+        reverse_shuffle = []
+        for s in shuffle:
+            new_s = [0]*len(s)
+            for i in range(len(s)):
+                new_s[s[i]] = i
+            reverse_shuffle.append(new_s)
+        return reverse_shuffle
+
+    def build_fast_variables(self):
+        weights = []
+        input_weights, input_inds = self.build_input_vector(self.leaf_id_order)
+        weights.append(input_weights)
+        for L in range(1, len(self.node_layers)):
+            ws = []
+            if isinstance(self.node_layers[L][0], SumNode):
+                i = 0;
+                j = 0;
+                print i
+                print self.node_layers[L]
+                while i < len(self.node_layers[L]) and isinstance(self.node_layers[L][i], SumNode):
+                    ws += map(lambda x: float(x), self.node_layers[L][i].weights);
+
+                    print self.inds[L-1][j:j+len(self.node_layers[L][i].weights)]
+                    j += len(self.node_layers[L][i].weights)
+                    i += 1;
+            print ws
+            weights.append(tf.Variable(ws, dtype=tf.float64))
+        self.weights = weights;
+        self.reverse_shuffle = self.build_reverse_shuffle(self.shuffle)
+        self.inds = map(lambda x: tf.constant(x), [input_inds]+self.inds)
+        self.shuffle = map(lambda x: tf.constant(x), self.shuffle)
+        self.reverse_shuffle = map(lambda x: tf.constant(x), self.reverse_shuffle)
+        # self.input_layers = map(lambda x: [0] + tf.constant(x), self.input_layers)
+
+    def build_fast_forward_pass(self):
+        computations = []
+        self.input = tf.placeholder(dtype=tf.float64, 
+                                         shape=(None, len(self.input_order)*2), name='Input')
+        # self.input = tf.placeholder(dtype=tf.float64, 
+        #                                  shape=(len(self.input_order)*2), name='Input')
+        #the input to be appended to each layer
+        input_splits = []
+        #compute the input
+        weights = []
+        for L in range(len(self.weights)):
+            n = tf.constant(0.000001, dtype=tf.float64)
+            weights.append(tf.add(tf.nn.relu(tf.sub(self.weights[L], n)), n))
+
+        with tf.name_scope('NORM_FACTOR'):
+            # print (map(lambda x: x.get_shape(), self.inds))
+            sum_of_weights = [tf.segment_sum(x, y) if x.get_shape()[0] > 0 else None for x, y in zip(self.weights, self.inds)]
+        # print sums_of_sparses
+        
+        with tf.name_scope('LEAFS_' + str(len(self.input_order))):
+            self.counting.append(self.input)
+            input_computation_w = tf.mul(self.input, weights[0])
+            input_computation_s = tf.transpose(tf.segment_sum(tf.transpose(input_computation_w), self.inds[0]))
+            input_computation_n = tf.div(input_computation_s, sum_of_weights[0])
+            computations.append(input_computation_n)
+            
+        #split the input computation and figure out which one goes in each layer
+            j = 0
+            for i in range(len(self.input_layers)):
+                a = tf.constant(j)
+                b = self.input_layers[i]
+                input_splits.append(tf.slice(input_computation_n, [0, a], [-1, b]))
+                # input_splits.append(tf.slice(input_computation_n, [a], [b]))
+                j += b;
+                # print "size"
+                # print size
+
+        current_computation = input_splits[0]
+# [TensorShape([Dimension(1574)]), TensorShape([Dimension(0)]), TensorShape([Dimension(28)]), TensorShape([Dimension(0)]), TensorShape([Dimension(98)]), TensorShape([Dimension(0)]), TensorShape([Dimension(16)])]
+# [66, 28, 560, 98, 186, 16, 1]
+# tests passed!
+        print "print shit"
+        for i in range(len(self.node_layers[1:])):
+            L = i+1 #the layer number
+            # print current_computation.get_shape()
+            # print self.shuffle[i]
+            # print self.inds[L].get_shape()
+            print "yoo"
+            
+            if self.weights[L].get_shape()[0] == 0: #product
+                current_computation = tf.log(current_computation)
+                current_computation = tf.transpose(tf.segment_sum(tf.transpose(current_computation), self.inds[L]))
+                current_computation = tf.exp(current_computation)
+            else:
+                self.counting.append(current_computation)
+                current_computation = tf.mul(current_computation, weights[L])
+                current_computation = tf.transpose(tf.segment_sum(tf.transpose(current_computation), self.inds[L]))
+                current_computation = tf.div(current_computation, sum_of_weights[L])
+                current_computation = tf.concat(1, [current_computation, input_splits[L]])
+                current_computation = tf.transpose(tf.gather(tf.transpose(current_computation), self.shuffle[L]))
+            computations.append(current_computation)
+
+        self.output = current_computation
+        with tf.name_scope('loss'):
+            self.loss = -tf.reduce_mean(tf.log(self.output))
+            self.loss_summary = tf.scalar_summary(self.summ, self.loss)
+        self.opt_val = self.optimizer().minimize(self.loss)
+        self.opt_val2 = self.optimizer2().minimize(self.loss)
+        self.computations = computations
+
+    def countss(self):
+        maxed_out = []
+        val = tf.constant(1.99, dtype=tf.float64)
+        t = lambda x: tf.transpose(x)
+        for c in range(len(self.counting)):
+            maxes = tf.mul(tf.transpose(tf.segment_max(tf.transpose(self.counting[c]), self.inds[c*2])), val)
+            back_maxes = tf.transpose(tf.gather(tf.transpose(maxes), self.inds[c*2]))
+            counts = tf.round(tf.div(self.counting[c], back_maxes))
+            maxed_out.append(counts)
+        updates = []
+        splits = []
+        curr = tf.constant([[1.0]], dtype=tf.float64)
+        for i in reversed(range(len(self.node_layers[1:]))):
+            L = i+1
+            if self.weights[L].get_shape()[0] == 0: #product node
+                curr = tf.transpose(tf.gather(tf.transpose(curr), self.inds[L], name="mysumgather"))
+                print "prd"
+            else: #sum node
+                print "sum"
+                curr = tf.transpose(tf.gather(tf.transpose(curr), self.reverse_shuffle[L]))
+                if (i != len(self.node_layers) - 2):
+                    curr, split = curr[:, :-self.input_layers[L]], curr[:, -self.input_layers[L]:]
+                    splits = [split] + splits;
+                curr = tf.transpose(tf.gather(tf.transpose(curr), self.inds[L], name="mysumgather"))
+                curr = tf.mul(curr, maxed_out[L//2])
+                updates.append(tf.reduce_sum(curr, reduction_indices=0))
+                
+
+        print splits
+        print curr
+        print updates
+        inputs = tf.concat(1, [curr] + splits);
+        gathered = tf.transpose(tf.gather(tf.transpose(inputs), self.inds[0]))
+        updates.append(tf.reduce_sum(tf.mul(gathered, self.input), reduction_indices=0))
+        self.updates = updates;
+
+    def apply_count(self, data):
+        updates = self.session.run(self.updates, {self.input: data})
+        # print map(lambda x: np.sum(x), updates)
+        # print updates
+
+        weights = filter(lambda x: x.get_shape()[0] > 0, self.weights)
+        for i in range(len(weights)):
+            u, w = list(reversed(updates))[i], weights[i]
+            z = tf.assign_add(w, u)
+            self.session.run(z)
+        # print updates
+
+    def fast_compile(self):
+        print "print shit2"
+        self.build_fast_variables()
+        print "print shit"
+        self.build_fast_forward_pass()
+        self.countss()
+        self.start_session()
+        self.writer = tf.train.SummaryWriter('logs/fast/try1', self.session.graph)
+        self.close_session()
     def start_session(self):
         assert self.session == None
         self.session = tf.Session()
@@ -123,6 +312,11 @@ class Model:
             else:
                 trainable = False
                 name = 'PROD_VARS' + str(L)
+            print weights
+            winds = zip(weights, indices);
+            winds.sort(lambda x, y: -1 if x[1][1] < y[1][1] else 1);
+            weights, indices = zip(*winds);
+            print indices;
             shape = [len(node_layer)-self.input_layers[L], len(self.node_layers[L-1])]
             with tf.name_scope(name):
                 W = tf.Variable(weights, trainable=trainable, dtype=tf.float64)
@@ -139,7 +333,6 @@ class Model:
         self.sparse_tensors = [input_matrix] + layer_matrices
         self.variables = [(input_weights, input_indices, input_shape, [len(self.input_order), len(self.input_order)*2])] + variables
 
-            
     def build_forward_graph(self):
         computations = []
 
@@ -179,12 +372,14 @@ class Model:
         with tf.name_scope('loss'):
             self.loss = -tf.reduce_mean(tf.log(self.output))
             self.loss_summary = tf.scalar_summary(self.summ, self.loss)
-        self.opt_val = self.optimizer().minimize(self.loss)
-        self.opt_val2 = self.optimizer2().minimize(self.loss)
+        self.opt_val = self.optimizer(0.0001).minimize(self.loss)
+        self.opt_val2 = self.optimizer2(0.0001).minimize(self.loss)
+        self.computations = computations
+    # def counting_step(self) :
 
 
     def get_normal_value(self):
-        ones = [[1]]*len(self.input_order)*2
+        ones = [[1]*len(self.input_order)*2]
         norm_value = self.output.eval(session=self.session, feed_dict = {self.input: ones})
         self.norm_value = norm_value
         return norm_value

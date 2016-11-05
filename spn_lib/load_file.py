@@ -84,9 +84,9 @@ def build_nodes(nodes, random_weights=False):
         elif 'LEAVE' in l:
             arr = l.split(',')
             if random_weights:
-                arr[3] = random.random();
+                arr[3] = random.random()
                 arr[4] = 1.0 - arr[3]
-            node = Leaf(arr[0], arr[3], arr[4], arr[2])
+            node = Leaf(arr[0], arr[4], arr[3], arr[2])
             big_dict[arr[0]] = node
             Leaves.append(arr[0])
     return Leaves, Prods, Sums, big_dict
@@ -123,6 +123,8 @@ def add_ranks(id_node_dict, leaf_id):
     currs = prev_currs
     while len(currs) > 0:
         new_currs = set()
+        print rank
+        print currs
         for s in list(currs):
             for p in id_node_dict[s].children:
                 new_currs.add(p)
@@ -135,7 +137,7 @@ def create_layers(id_node_dict, rank):
     node_list = [[] for x in range(rank)]
     for k in id_node_dict.keys():
         n = id_node_dict[k]
-        # print n.TRank
+        print n.TRank
         node_list[n.TRank].append(n)
     return node_list[1:]
 
@@ -203,7 +205,7 @@ def load_file(fname, random_weights=False):
     #get the node and edge strings from a file
     file_nodes, file_edges = split_up_file(fname)
     #get all the different nodes and a dict that matches id to node
-    leaf_ids, prod_ids, sum_ids, id_node_dict = build_nodes(file_nodes, random_weights)
+    leaf_ids, prod_ids, sum_ids, id_node_dict = build_nodes(file_nodes)
     #add all the edges to the nodes
     id_node_dict = add_connections(id_node_dict, file_edges, random_weights)
     if random_weights:
