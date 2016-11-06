@@ -98,3 +98,24 @@ def e_load(fname, random_weights=False):
     leaf_id_order, input_layers, input_orders = clean_up_inputs(node_layers)
 
     return pos_dict, id_node_dict, node_layers, leaf_id_order, input_layers, input_orders, shuffle_layers, inds
+
+def e_build_random_net(bf, inp_size):
+    init_node = SumNode('0')
+    network, _ = generate_children([], init_node, range(inp_size), bf)
+    leaf_ids, prod_ids, sum_ids, id_node_dict = format_list_of_nodes(network)
+    print len(id_node_dict)
+    #determine all the ranks for each node
+    rank, id_node_dict = add_ranks(id_node_dict, leaf_ids)
+    #turn them all into layers
+    top ,rank, id_node_dict = e_add_ranks(id_node_dict, leaf_ids)
+    #turn them all into layers
+    shuffle_layers, inds = e_create_layers(id_node_dict, rank, top)
+    node_layers, shuffle_layers = e_finish_layers(shuffle_layers)
+    # print map(lambda x: len(x), node_layers)
+    #create a dict for the position of every node given the ids
+    pos_dict, node_layers = e_make_pos_dict(node_layers)
+    #getting the ordering right
+    print "print ur mom"
+    leaf_id_order, input_layers, input_orders = clean_up_inputs(node_layers)
+
+    return pos_dict, id_node_dict, node_layers, leaf_id_order, input_layers, input_orders, shuffle_layers, inds

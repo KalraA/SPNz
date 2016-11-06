@@ -31,6 +31,8 @@ class Model:
         self.weights = None
         self.counting = []
         self.updates = []
+        self.sum_of_weights = []
+        self.norm_weights = []
 
         #Nodes loaded from files
     
@@ -50,11 +52,11 @@ class Model:
 
         #Do Work
 
-    def build_model_from_file(self, fname, random_weights):
+    def build_model_from_file(self, fname, random_weights, mem=False):
         self.pos_dict, self.id_node_dict, self.node_layers, self.leaf_id_order, self.input_layers, self.input_order = load_file(fname, random_weights)
 
     def build_random_model(self, bfactor, input_length):
-        self.pos_dict, self.id_node_dict, self.node_layers, self.leaf_id_order, self.input_layers, self.input_order = build_random_net(bfactor, input_length)
+        self.pos_dict, self.id_node_dict, self.node_layers, self.leaf_id_order, self.input_layers, self.input_order, self.shuffle, self.inds = e_build_random_net(bfactor, input_length)
 
     def build_fast_model(self, bfactor, input_length):
         self.pos_dict, self.id_node_dict, self.node_layers, self.leaf_id_order, self.input_layers, self.input_order, self.shuffle, self.inds = e_load(bfactor, input_length)
@@ -116,6 +118,16 @@ class Model:
         self.reverse_shuffle = map(lambda x: tf.constant(x), self.reverse_shuffle)
         # self.input_layers = map(lambda x: [0] + tf.constant(x), self.input_layers)
 
+    def normalize_weights(self):
+        weights = filter(lambda x: x != None, self.norm_weights)
+        new_weights = self.session.run(weights);
+        old_weights = filter(lambda x: x.get_shape()[0] > 0, self.weights)
+        for w, n in zip(old_weights, new_weights):
+            print w.get_shape()
+            print n.shape
+            z = w.assign(n)
+            self.session.run(z)
+
     def build_fast_forward_pass(self):
         computations = []
         self.input = tf.placeholder(dtype=tf.float64, 
@@ -132,7 +144,9 @@ class Model:
 
         with tf.name_scope('NORM_FACTOR'):
             # print (map(lambda x: x.get_shape(), self.inds))
-            sum_of_weights = [tf.segment_sum(x, y) if x.get_shape()[0] > 0 else None for x, y in zip(self.weights, self.inds)]
+            self.sum_of_weights = [tf.segment_sum(x, y) if x.get_shape()[0] > 0 else None for x, y in zip(weights, self.inds)]
+            sum_of_weights = self.sum_of_weights
+            self.norm_weights = [tf.div(x, tf.gather(y, z)) if x.get_shape()[0] > 0 else None for x, y, z in zip(weights, self.sum_of_weights, self.inds)]
         # print sums_of_sparses
         
         with tf.name_scope('LEAFS_' + str(len(self.input_order))):
@@ -157,6 +171,7 @@ class Model:
 # [TensorShape([Dimension(1574)]), TensorShape([Dimension(0)]), TensorShape([Dimension(28)]), TensorShape([Dimension(0)]), TensorShape([Dimension(98)]), TensorShape([Dimension(0)]), TensorShape([Dimension(16)])]
 # [66, 28, 560, 98, 186, 16, 1]
 # tests passed!
+
         print "print shit"
         for i in range(len(self.node_layers[1:])):
             L = i+1 #the layer number
@@ -182,8 +197,8 @@ class Model:
         with tf.name_scope('loss'):
             self.loss = -tf.reduce_mean(tf.log(self.output))
             self.loss_summary = tf.scalar_summary(self.summ, self.loss)
-        self.opt_val = self.optimizer().minimize(self.loss)
-        self.opt_val2 = self.optimizer2().minimize(self.loss)
+        self.opt_val = self.optimizer(0.001).minimize(self.loss)
+        self.opt_val2 = self.optimizer(0.001).minimize(self.loss)
         self.computations = computations
 
     def countss(self):
@@ -201,12 +216,12 @@ class Model:
         for i in reversed(range(len(self.node_layers[1:]))):
             L = i+1
             if self.weights[L].get_shape()[0] == 0: #product node
-                curr = tf.transpose(tf.gather(tf.transpose(curr), self.inds[L], name="mysumgather"))
+                curr = tf.transpose(tf.gather(tf.transpose(curr), self.inds[L], name="myprodgather"))
                 print "prd"
             else: #sum node
                 print "sum"
                 curr = tf.transpose(tf.gather(tf.transpose(curr), self.reverse_shuffle[L]))
-                if (i != len(self.node_layers) - 2):
+                if (self.input_layers[L] > 0):
                     curr, split = curr[:, :-self.input_layers[L]], curr[:, -self.input_layers[L]:]
                     splits = [split] + splits;
                 curr = tf.transpose(tf.gather(tf.transpose(curr), self.inds[L], name="mysumgather"))
@@ -372,8 +387,8 @@ class Model:
         with tf.name_scope('loss'):
             self.loss = -tf.reduce_mean(tf.log(self.output))
             self.loss_summary = tf.scalar_summary(self.summ, self.loss)
-        self.opt_val = self.optimizer(0.0001).minimize(self.loss)
-        self.opt_val2 = self.optimizer2(0.0001).minimize(self.loss)
+        # self.opt_val = self.optimizer(0.01).minimize(self.loss)
+        # self.opt_val2 = self.optimizer2(0.01).minimize(self.loss)
         self.computations = computations
     # def counting_step(self) :
 

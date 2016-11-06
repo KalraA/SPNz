@@ -1,0 +1,1 @@
+losses = {'test_loss':6.10823767675, 'val_loss':6.04861788872, 'name': 'nltcs' }

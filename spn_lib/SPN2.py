@@ -23,7 +23,7 @@ class SPN:
 	def make_random_model(self, bfactor, input_size):
 		self.model = Model()
 		self.model.build_random_model(bfactor, input_size)
-		self.model.compile()
+		self.model.fast_compile()
 		self.data = Data(self.model.input_order)
 		self.input_order = self.model.input_order
 
@@ -34,9 +34,14 @@ class SPN:
 		self.data = Data(self.model.input_order)
 		self.input_order = self.model.input_order
 
-	def add_data(self, filename, dataset='train'):
+	def add_data(self, filename, dataset='train', mem=False):
 		if dataset == 'train':
-			self.data.load_and_process_train_data(filename)
+			if mem:
+				print "zebra"
+				self.data.load_and_process_train_data_mem(filename)
+			else:
+				print "zebro"
+				self.data.load_and_process_train_data(filename)
 		elif dataset == 'valid':
 			self.data.load_and_process_valid_data(filename)
 		elif dataset == 'test':

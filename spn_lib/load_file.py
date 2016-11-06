@@ -7,7 +7,7 @@ import numpy as np
 def generate_children(nodes, curr_node, scope, bf):
     curr_id = int(curr_node.id) + 1
     if isinstance(curr_node, PrdNode):
-        num_children = random.randint(bf[0], bf[1])
+        num_children = random.randint(bf[0][0], bf[0][1])
         scopes = [[] for x in range(num_children)]
         weights = np.array([1.0]*num_children)/num_children
         for s in scope:
@@ -33,7 +33,7 @@ def generate_children(nodes, curr_node, scope, bf):
         nodes.append(curr_node)
         return nodes, curr_id+1
     else:
-        num_children = random.randint(bf[0], bf[1])
+        num_children = random.randint(bf[1][0], bf[1][1])
         scopes = [scope]*num_children
         print scopes
         for c in xrange(len(scopes)):
